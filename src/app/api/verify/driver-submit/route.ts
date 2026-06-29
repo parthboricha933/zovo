@@ -81,5 +81,7 @@ export async function POST(req: NextRequest) {
     await db.user.update({ where: { id: user.id }, data: { driverStatus: 'PENDING' } })
   }
 
-  return NextResponse.json({ ok: true, profile })
+  // Re-fetch the profile so the response reflects the post-approve state
+  const updatedProfile = await db.driverProfile.findUnique({ where: { userId: user.id } })
+  return NextResponse.json({ ok: true, profile: updatedProfile })
 }

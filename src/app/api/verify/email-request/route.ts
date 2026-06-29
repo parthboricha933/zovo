@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { sendVerificationEmail } from '@/lib/mailer'
+import { shouldAutoApproveVerifications } from '@/lib/dev-mode'
 
 /**
  * Generate a fresh email verification token, store it on the user's Verification
@@ -31,7 +32,8 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     message: 'Verification email sent. Check your inbox (and spam folder).',
-    // In dev, also return the token so you can verify without email access
-    devToken: process.env.NODE_ENV !== 'production' ? token : undefined,
+    // When auto-approve is enabled (dev or AUTO_APPROVE_VERIFICATIONS=1),
+    // also return the token so you can verify without email access
+    devToken: shouldAutoApproveVerifications() ? token : undefined,
   })
 }
