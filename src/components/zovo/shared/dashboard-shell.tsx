@@ -6,12 +6,13 @@ import { useUIStore } from '@/lib/stores/ui-store'
 import { useRealtimeStore } from '@/lib/stores/realtime-store'
 import { api } from '@/lib/api-client'
 import { toast } from 'sonner'
-import { Bell, Menu, X, LogOut, RefreshCw, ShieldCheck, Settings, Moon, Sun } from 'lucide-react'
+import { Bell, Menu, X, LogOut, RefreshCw, ShieldCheck, Settings, Moon, Sun, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet'
 import { ZovoLogo } from './logo'
 import { cn } from '@/lib/utils'
+import { getNotificationTargetView, getNotificationTargetParams } from '@/lib/notification-routing'
 import type { AppNotification } from '@/lib/api-client'
 
 interface NavItem {
@@ -283,31 +284,47 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                     {notifications.length === 0 ? (
                       <div className="p-8 text-center text-sm text-muted-foreground">No notifications yet</div>
                     ) : (
-                      notifications.map((n) => (
-                        <button
-                          key={n.id}
-                          onClick={async () => {
-                            if (!n.readAt) {
-                              await api.notifications.markRead(n.id)
-                              setNotifications((prev) => prev.map((x) => x.id === n.id ? { ...x, readAt: new Date().toISOString() } : x))
-                              setUnread((u) => Math.max(0, u - 1))
-                            }
-                          }}
-                          className={cn(
-                            'w-full text-left p-3 border-b last:border-b-0 hover:bg-muted/50 flex gap-3',
-                            !n.readAt && 'bg-primary/5'
-                          )}
-                        >
-                          <div className={cn('h-2 w-2 rounded-full mt-1.5', n.readAt ? 'bg-transparent' : 'bg-primary')} />
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium">{n.title}</div>
-                            <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.body}</div>
-                            <div className="text-[10px] text-muted-foreground mt-1">
-                              {new Date(n.createdAt).toLocaleString()}
+                      notifications.map((n) => {
+                        const targetView = getNotificationTargetView(n)
+                        const targetParams = getNotificationTargetParams(n)
+                        return (
+                          <button
+                            key={n.id}
+                            onClick={async () => {
+                              if (!n.readAt) {
+                                await api.notifications.markRead(n.id)
+                                setNotifications((prev) => prev.map((x) => x.id === n.id ? { ...x, readAt: new Date().toISOString() } : x))
+                                setUnread((u) => Math.max(0, u - 1))
+                              }
+                              // Navigate to the relevant page
+                              if (targetView) {
+                                setShowNotifs(false)
+                                navigate(targetView, targetParams)
+                              }
+                            }}
+                            className={cn(
+                              'w-full text-left p-3 border-b last:border-b-0 hover:bg-muted/50 flex gap-3',
+                              !n.readAt && 'bg-primary/5',
+                              targetView && 'cursor-pointer'
+                            )}
+                          >
+                            <div className={cn('h-2 w-2 rounded-full mt-1.5 shrink-0', n.readAt ? 'bg-transparent' : 'bg-primary')} />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium flex items-center gap-1.5">
+                                {n.title}
+                                {targetView && (
+                                  <ChevronRight className="h-3 w-3 text-muted-foreground ml-auto shrink-0" />
+                                )}
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.body}</div>
+                              <div className="text-[10px] text-muted-foreground mt-1 flex items-center gap-2">
+                                <span>{new Date(n.createdAt).toLocaleString()}</span>
+                                {targetView && <span className="text-primary">Tap to open →</span>}
+                              </div>
                             </div>
-                          </div>
-                        </button>
-                      ))
+                          </button>
+                        )
+                      })
                     )}
                   </div>
                 )}

@@ -3,6 +3,8 @@
 import { create } from 'zustand'
 import { io, Socket } from 'socket.io-client'
 import { toast } from 'sonner'
+import { getNotificationTargetView, getNotificationTargetParams } from '@/lib/notification-routing'
+import { useUIStore } from '@/lib/stores/ui-store'
 
 interface RealtimeState {
   socket: Socket | null
@@ -61,7 +63,19 @@ export const useRealtimeStore = create<RealtimeState>((set, get) => ({
 
     socket.on('notification', (n) => {
       dispatch('notification', n)
-      toast(n.title, { description: n.body })
+      // Show a clickable toast that navigates to the relevant page
+      const targetView = getNotificationTargetView(n)
+      const targetParams = getNotificationTargetParams(n)
+      toast(n.title, {
+        description: n.body,
+        duration: 8000,
+        action: targetView ? {
+          label: 'Open',
+          onClick: () => {
+            useUIStore.getState().navigate(targetView, targetParams)
+          },
+        } : undefined,
+      })
     })
     socket.on('booking:request', (d) => dispatch('booking:request', d))
     socket.on('booking:accepted', (d) => dispatch('booking:accepted', d))

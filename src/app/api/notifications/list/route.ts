@@ -19,7 +19,12 @@ export async function GET(req: NextRequest) {
     take: limit,
   })
 
-  return NextResponse.json({ items })
+  return NextResponse.json({
+    items: items.map((n) => ({
+      ...n,
+      data: n.dataJson ? (() => { try { return JSON.parse(n.dataJson) } catch { return null } })() : null,
+    })),
+  })
 }
 
 export async function POST(req: NextRequest) {
