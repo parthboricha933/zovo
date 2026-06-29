@@ -162,7 +162,7 @@ export function DriverActive() {
 function ActiveRideDetail({ ride, otpInput, setOtpInput, verifying, onVerify, onActivate, onComplete, onCancel, onChat }: any) {
   const [bookings, setBookings] = useState<Booking[]>([])
   const [liveLocs, setLiveLocs] = useState<Record<string, { lat: number; lng: number }>>({})
-  const { subscribeRide, leaveRide, on } = useRealtimeStore()
+  const { subscribeRide, leaveRide, on, connected: socketConnected } = useRealtimeStore()
 
   const loadBookings = async () => {
     try {
@@ -185,8 +185,13 @@ function ActiveRideDetail({ ride, otpInput, setOtpInput, verifying, onVerify, on
     }
     doLoad()
     subscribeRide(ride.id)
-    return () => { cancelled = true; leaveRide(ride.id) }
-  }, [ride.id])
+    // Poll for booking updates when socket isn't connected (Vercel fallback)
+    let i: any
+    if (!socketConnected) {
+      i = setInterval(doLoad, 5000)
+    }
+    return () => { cancelled = true; leaveRide(ride.id); if (i) clearInterval(i) }
+  }, [ride.id, socketConnected])
 
   useEffect(() => {
     const off = on('ride:location', (d) => {
@@ -338,21 +343,28 @@ function PassengerRow({ booking, ride, otpInput, setOtpInput, verifying, onVerif
         </div>
       </div>
 
-      {booking.status === 'CONFIRMED' && ride.status === 'ACTIVE' && (
-        <div className="mt-2 pt-2 border-t flex gap-2 items-end">
-          <div className="flex-1 space-y-1">
-            <Label className="text-xs flex items-center gap-1"><ShieldCheck className="h-3 w-3" /> Enter OTP from passenger</Label>
-            <Input
-              value={otpInput}
-              onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="6-digit OTP"
-              className="font-mono tracking-widest"
-              inputMode="numeric"
-            />
+      {booking.status === 'CONFIRMED' && (
+        <div className="mt-2 pt-2 border-t space-y-2">
+          <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800 flex items-center gap-1.5">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Ask the passenger for their 6-digit OTP, then enter it below to start the ride.
           </div>
-          <Button size="sm" onClick={onVerify} disabled={verifying || otpInput.length !== 6}>
-            {verifying ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-          </Button>
+          <div className="flex gap-2 items-end">
+            <div className="flex-1 space-y-1">
+              <Label className="text-xs flex items-center gap-1"><ShieldCheck className="h-3 w-3" /> Enter OTP from passenger</Label>
+              <Input
+                value={otpInput}
+                onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="6-digit OTP"
+                className="font-mono tracking-widest text-lg"
+                inputMode="numeric"
+              />
+            </div>
+            <Button size="sm" onClick={onVerify} disabled={verifying || otpInput.length !== 6}>
+              {verifying ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+              <span className="ml-1">Verify &amp; Start</span>
+            </Button>
+          </div>
         </div>
       )}
 

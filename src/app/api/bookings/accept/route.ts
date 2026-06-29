@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { notify } from '@/lib/notify'
 import { pushToUser } from '@/lib/realtime-push'
 import { generateOtpCode } from '@/lib/auth'
+import { sendBookingAcceptedEmail } from '@/lib/mailer'
 
 /**
  * Driver accepts a booking request.
@@ -11,7 +12,7 @@ import { generateOtpCode } from '@/lib/auth'
  * - Generates OTP
  * - Decrements ride.availableSeats
  * - Notifies passenger + pushes realtime event
- * - Auto-rejects conflicting requests if ride is now full
+ * - Sends email to passenger with ride details + OTP
  */
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser()
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest) {
 
   const booking = await db.booking.findUnique({
     where: { id: bookingId },
-    include: { ride: true, passenger: { select: { id: true, name: true, phone: true } } },
+    include: { ride: true, passenger: { select: { id: true, name: true, phone: true, email: true } } },
   })
   if (!booking) return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
   if (booking.ride.driverId !== user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -60,6 +61,19 @@ export async function POST(req: NextRequest) {
   })
   // Send OTP to passenger only (driver gets it via the verify-otp route)
   await pushToUser(booking.passengerId, 'otp:generated', { bookingId: booking.id, otp })
+
+  // Send email to passenger with booking details + OTP
+  await sendBookingAcceptedEmail({
+    to: booking.passenger.email,
+    passengerName: booking.passenger.name,
+    driverName: user.name,
+    pickupAddress: booking.ride.pickupAddress,
+    destAddress: booking.ride.destAddress,
+    departureTime: booking.ride.departureTime,
+    totalPrice: booking.totalPrice,
+    seatsBooked: booking.seatsBooked,
+    otp,
+  })
 
   return NextResponse.json({ ok: true, bookingId, status: 'CONFIRMED' })
 }

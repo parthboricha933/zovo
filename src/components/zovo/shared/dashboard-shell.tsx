@@ -94,6 +94,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   }, [])
 
   // Load unread count + recent notifications
+  // Poll more aggressively when socket isn't connected (Vercel production fallback)
+  const { connected: socketConnected } = useRealtimeStore()
   useEffect(() => {
     if (!user) return
     const load = async () => {
@@ -107,9 +109,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       } catch {}
     }
     load()
-    const i = setInterval(load, 30000)
+    // Poll every 30s when socket is connected, every 8s when not (fallback)
+    const interval = socketConnected ? 30000 : 8000
+    const i = setInterval(load, interval)
     return () => clearInterval(i)
-  }, [user?.id])
+  }, [user?.id, socketConnected])
 
   if (!user) return null
 

@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { notify } from '@/lib/notify'
 import { pushToRide } from '@/lib/realtime-push'
+import { sendRideCompletedEmail } from '@/lib/mailer'
 
 /**
  * Driver completes the ride.
@@ -12,6 +13,7 @@ import { pushToRide } from '@/lib/realtime-push'
  * - Aggregates driver earnings + ride counts
  * - Updates passenger ride counts
  * - Updates LiveLocation cleanup
+ * - Sends "ride completed" email to passengers
  */
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser()
@@ -22,7 +24,7 @@ export async function POST(req: NextRequest) {
 
   const ride = await db.ride.findUnique({
     where: { id: rideId },
-    include: { bookings: true, vehicle: true },
+    include: { bookings: { include: { passenger: { select: { id: true, name: true, email: true } } } }, vehicle: true },
   })
   if (!ride) return NextResponse.json({ error: 'Ride not found' }, { status: 404 })
   if (ride.driverId !== user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -87,7 +89,7 @@ export async function POST(req: NextRequest) {
     await tx.liveLocation.deleteMany({ where: { rideId } })
   })
 
-  // Notify passengers
+  // Notify passengers + send emails
   for (const b of completedBookings) {
     await notify({
       userId: b.passengerId,
@@ -95,6 +97,18 @@ export async function POST(req: NextRequest) {
       title: 'Ride Completed',
       body: 'Your ride has been completed. Please rate your experience.',
       data: { rideId, bookingId: b.id },
+    })
+
+    // Send ride-completed email to passenger
+    await sendRideCompletedEmail({
+      to: b.passenger.email,
+      passengerName: b.passenger.name,
+      driverName: user.name,
+      pickupAddress: ride.pickupAddress,
+      destAddress: ride.destAddress,
+      departureTime: ride.departureTime,
+      totalPrice: b.totalPrice,
+      seatsBooked: b.seatsBooked,
     })
   }
   await pushToRide(rideId, 'ride:completed', { rideId })

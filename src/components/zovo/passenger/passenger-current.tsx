@@ -22,7 +22,7 @@ import { cn } from '@/lib/utils'
 export function PassengerCurrent() {
   const { params, navigate } = useUIStore()
   const { user } = useAuthStore()
-  const { subscribeRide, leaveRide, subscribeBooking, on } = useRealtimeStore()
+  const { subscribeRide, leaveRide, subscribeBooking, on, connected: socketConnected } = useRealtimeStore()
   const [bookings, setBookings] = useState<Booking[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(params.bookingId || null)
   const [loading, setLoading] = useState(true)
@@ -44,7 +44,13 @@ export function PassengerCurrent() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  // Poll for booking status updates when socket isn't connected (Vercel fallback)
+  useEffect(() => {
+    load()
+    if (socketConnected) return // socket will push updates
+    const i = setInterval(load, 5000) // poll every 5s
+    return () => clearInterval(i)
+  }, [socketConnected])
 
   // Live updates
   useEffect(() => {
