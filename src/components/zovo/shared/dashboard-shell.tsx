@@ -96,6 +96,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   // Load unread count + recent notifications
   // Poll more aggressively when socket isn't connected (Vercel production fallback)
   const { connected: socketConnected } = useRealtimeStore()
+  const [navCounts, setNavCounts] = useState<Record<string, number>>({})
   useEffect(() => {
     if (!user) return
     const load = async () => {
@@ -106,6 +107,24 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         ])
         setUnread(count)
         setNotifications(items)
+
+        // Fetch per-nav-item counts for red badges
+        const counts: Record<string, number> = {}
+        if (user.activeRole === 'PASSENGER') {
+          // Current Booking = active bookings count
+          const b = await api.bookings.list(new URLSearchParams({ role: 'PASSENGER' }))
+          counts['passenger.current'] = b.items.filter((x) => ['REQUESTED', 'CONFIRMED', 'STARTED'].includes(x.status)).length
+        } else if (user.activeRole === 'DRIVER') {
+          // Ride Requests = pending booking requests on my rides
+          const reqs = await api.bookings.list(new URLSearchParams({ role: 'DRIVER', status: 'REQUESTED' }))
+          counts['driver.requests'] = reqs.items.length
+          // Active Ride = active/ongoing rides
+          const rides = await api.rides.list(new URLSearchParams({ role: 'DRIVER' }))
+          counts['driver.active'] = rides.items.filter((r: any) => ['ACTIVE', 'ONGOING'].includes(r.status)).length
+          // Upcoming = scheduled rides
+          counts['driver.upcoming'] = rides.items.filter((r: any) => r.status === 'SCHEDULED' && new Date(r.departureTime) >= new Date()).length
+        }
+        setNavCounts(counts)
       } catch {}
     }
     load()
@@ -113,7 +132,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     const interval = socketConnected ? 30000 : 8000
     const i = setInterval(load, interval)
     return () => clearInterval(i)
-  }, [user?.id, socketConnected])
+  }, [user?.id, socketConnected, view])
 
   if (!user) return null
 
@@ -137,6 +156,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         {nav.map((item) => {
           const Icon = IconCmp(item.icon)
           const active = view === item.view
+          const badge = navCounts[item.view] || 0
           return (
             <button
               key={item.view}
@@ -149,7 +169,15 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               )}
             >
               <Icon className="h-4 w-4 shrink-0" />
-              <span className="truncate">{item.label}</span>
+              <span className="truncate flex-1 text-left">{item.label}</span>
+              {badge > 0 && (
+                <span className={cn(
+                  'h-5 min-w-5 px-1.5 grid place-items-center text-[11px] font-bold rounded-full',
+                  active ? 'bg-white/25 text-sidebar-primary-foreground' : 'bg-red-500 text-white'
+                )}>
+                  {badge > 9 ? '9+' : badge}
+                </span>
+              )}
             </button>
           )
         })}

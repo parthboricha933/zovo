@@ -26,7 +26,6 @@ export function DriverActive() {
   const [rides, setRides] = useState<Ride[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(params.rideId || null)
   const [loading, setLoading] = useState(true)
-  const [otpInput, setOtpInput] = useState('')
   const [verifying, setVerifying] = useState(false)
   const [showChat, setShowChat] = useState(false)
   const [chatBookingId, setChatBookingId] = useState<string | null>(null)
@@ -113,14 +112,11 @@ export function DriverActive() {
 
       <ActiveRideDetail
         ride={selected}
-        otpInput={otpInput}
-        setOtpInput={setOtpInput}
         verifying={verifying}
-        onVerify={async (bookingId) => {
+        onVerify={async (bookingId, otp) => {
           setVerifying(true)
           try {
-            await api.bookings.verifyOtp(bookingId, otpInput)
-            setOtpInput('')
+            await api.bookings.verifyOtp(bookingId, otp)
             toast.success('OTP verified — ride started')
             load()
           } catch (e: any) { toast.error(e.message) }
@@ -159,7 +155,7 @@ export function DriverActive() {
   )
 }
 
-function ActiveRideDetail({ ride, otpInput, setOtpInput, verifying, onVerify, onActivate, onComplete, onCancel, onChat }: any) {
+function ActiveRideDetail({ ride, verifying, onVerify, onActivate, onComplete, onCancel, onChat }: any) {
   const [bookings, setBookings] = useState<Booking[]>([])
   const [liveLocs, setLiveLocs] = useState<Record<string, { lat: number; lng: number }>>({})
   const { subscribeRide, leaveRide, on, connected: socketConnected } = useRealtimeStore()
@@ -258,19 +254,30 @@ function ActiveRideDetail({ ride, otpInput, setOtpInput, verifying, onVerify, on
               </div>
             </div>
 
-            <div className="flex gap-2 pt-2">
+            <div className="flex flex-wrap gap-2 pt-2">
               {ride.status === 'SCHEDULED' && (
                 <>
-                  <Button size="sm" className="flex-1" onClick={onActivate}><Play className="h-4 w-4 mr-1.5" /> Activate ride</Button>
-                  <Button size="sm" variant="outline" className="text-destructive" onClick={onCancel}><X className="h-4 w-4" /></Button>
+                  <Button size="sm" className="flex-1" onClick={onActivate}>
+                    <Play className="h-4 w-4 mr-1.5" /> Activate ride
+                  </Button>
+                  <Button size="sm" variant="outline" className="text-destructive" onClick={onCancel}>
+                    <X className="h-4 w-4 mr-1.5" /> Cancel
+                  </Button>
                 </>
               )}
               {ride.status === 'ACTIVE' && (
-                <Button size="sm" variant="outline" className="text-destructive flex-1" onClick={onCancel}>Cancel ride</Button>
+                <>
+                  <Button size="sm" className="flex-1" onClick={onComplete}>
+                    <CheckCircle2 className="h-4 w-4 mr-1.5" /> End ride
+                  </Button>
+                  <Button size="sm" variant="outline" className="text-destructive" onClick={onCancel}>
+                    <X className="h-4 w-4 mr-1.5" /> Cancel
+                  </Button>
+                </>
               )}
               {ride.status === 'ONGOING' && (
                 <Button size="sm" className="flex-1" onClick={onComplete}>
-                  <CheckCircle2 className="h-4 w-4 mr-1.5" /> Complete ride
+                  <CheckCircle2 className="h-4 w-4 mr-1.5" /> End ride
                 </Button>
               )}
             </div>
@@ -291,10 +298,8 @@ function ActiveRideDetail({ ride, otpInput, setOtpInput, verifying, onVerify, on
                   key={b.id}
                   booking={b}
                   ride={ride}
-                  otpInput={otpInput}
-                  setOtpInput={setOtpInput}
                   verifying={verifying}
-                  onVerify={() => onVerify(b.id)}
+                  onVerify={(otp: string) => onVerify(b.id, otp)}
                   onChat={() => onChat(b.id)}
                 />
               ))
@@ -316,7 +321,8 @@ function ActiveRideDetail({ ride, otpInput, setOtpInput, verifying, onVerify, on
   )
 }
 
-function PassengerRow({ booking, ride, otpInput, setOtpInput, verifying, onVerify, onChat }: any) {
+function PassengerRow({ booking, ride, verifying, onVerify, onChat }: any) {
+  const [localOtp, setLocalOtp] = useState('')
   const statusColor: Record<string, string> = {
     REQUESTED: 'bg-amber-100 text-amber-800',
     CONFIRMED: 'bg-emerald-100 text-emerald-800',
@@ -353,17 +359,26 @@ function PassengerRow({ booking, ride, otpInput, setOtpInput, verifying, onVerif
             <div className="flex-1 space-y-1">
               <Label className="text-xs flex items-center gap-1"><ShieldCheck className="h-3 w-3" /> Enter OTP from passenger</Label>
               <Input
-                value={otpInput}
-                onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                value={localOtp}
+                onChange={(e) => setLocalOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 placeholder="6-digit OTP"
                 className="font-mono tracking-widest text-lg"
                 inputMode="numeric"
               />
             </div>
-            <Button size="sm" onClick={onVerify} disabled={verifying || otpInput.length !== 6}>
+            <Button size="sm" onClick={() => onVerify(localOtp)} disabled={verifying || localOtp.length !== 6}>
               {verifying ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
               <span className="ml-1">Verify &amp; Start</span>
             </Button>
+          </div>
+        </div>
+      )}
+
+      {booking.status === 'STARTED' && (
+        <div className="mt-2 pt-2 border-t">
+          <div className="rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-800 flex items-center gap-1.5">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            Ride in progress — passenger picked up.
           </div>
         </div>
       )}
