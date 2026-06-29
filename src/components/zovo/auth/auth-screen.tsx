@@ -55,7 +55,7 @@ export function AuthScreen() {
       <div className="hidden lg:flex flex-col justify-between p-12 bg-primary text-primary-foreground relative overflow-hidden">
         <div className="zovo-grid-bg absolute inset-0 opacity-10" />
         <div className="relative">
-          <ZovoLogo size="lg" className="[&_span]:text-primary-foreground [&_div]:bg-white/15" />
+          <ZovoLogo size="lg" className="[&>div]:brightness-0 [&>div]:invert" />
         </div>
         <div className="relative space-y-6 max-w-md">
           <h1 className="text-4xl font-bold leading-tight">

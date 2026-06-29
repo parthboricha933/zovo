@@ -14,21 +14,27 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ZOVO — Share the ride, share the journey",
+  title: "ZOVO — Ride. Connect. Explore.",
   description:
     "ZOVO connects drivers with empty seats to passengers going the same way. Book a ride, offer a seat, travel together.",
   keywords: ["ZOVO", "ride-sharing", "carpool", "travel", "driver", "passenger"],
   authors: [{ name: "ZOVO Team" }],
+  icons: {
+    icon: "/zovo.png",
+    apple: "/zovo.png",
+  },
   openGraph: {
-    title: "ZOVO — Share the ride, share the journey",
+    title: "ZOVO — Ride. Connect. Explore.",
     description: "Real-time ride-sharing with live GPS tracking, OTP ride starts, and in-app chat.",
     siteName: "ZOVO",
     type: "website",
+    images: ["/zovo.png"],
   },
   twitter: {
     card: "summary_large_image",
     title: "ZOVO",
-    description: "Share the ride, share the journey.",
+    description: "Ride. Connect. Explore.",
+    images: ["/zovo.png"],
   },
 };
 
