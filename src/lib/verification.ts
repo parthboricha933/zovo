@@ -1,4 +1,5 @@
 import { db } from './db'
+import { shouldAutoApproveVerifications } from './dev-mode'
 
 /**
  * Verification gate helper.
@@ -52,28 +53,28 @@ export async function getVerificationStatus(userId: string): Promise<Verificatio
 }
 
 /**
- * In dev mode, auto-approve phone + KYC for a freshly registered user.
- * Email verification is a real flow (token-based) but in dev we can also pre-approve
- * for convenience — we expose both via the /api/verify/email-confirm dev shortcut.
+ * Auto-approve phone + KYC for a freshly registered user.
+ * Email verification is a real flow (token-based).
+ *
+ * Enable in production by setting AUTO_APPROVE_VERIFICATIONS=1.
  */
 export async function autoApproveDevVerifications(userId: string) {
-  if (process.env.NODE_ENV !== 'production') {
-    await db.user.update({
-      where: { id: userId },
-      data: {
-        phoneVerified: true,
-        kycStatus: 'APPROVED',
-      },
-    })
-    await db.verification.upsert({
-      where: { userId_type: { userId, type: 'PHONE' } },
-      update: { status: 'APPROVED', reviewedAt: new Date() },
-      create: { userId, type: 'PHONE', status: 'APPROVED', reviewedAt: new Date() },
-    }).catch(() => {})
-    await db.verification.upsert({
-      where: { userId_type: { userId, type: 'KYC' } },
-      update: { status: 'APPROVED', reviewedAt: new Date() },
-      create: { userId, type: 'KYC', status: 'APPROVED', reviewedAt: new Date() },
-    }).catch(() => {})
-  }
+  if (!shouldAutoApproveVerifications()) return
+  await db.user.update({
+    where: { id: userId },
+    data: {
+      phoneVerified: true,
+      kycStatus: 'APPROVED',
+    },
+  })
+  await db.verification.upsert({
+    where: { userId_type: { userId, type: 'PHONE' } },
+    update: { status: 'APPROVED', reviewedAt: new Date() },
+    create: { userId, type: 'PHONE', status: 'APPROVED', reviewedAt: new Date() },
+  }).catch(() => {})
+  await db.verification.upsert({
+    where: { userId_type: { userId, type: 'KYC' } },
+    update: { status: 'APPROVED', reviewedAt: new Date() },
+    create: { userId, type: 'KYC', status: 'APPROVED', reviewedAt: new Date() },
+  }).catch(() => {})
 }

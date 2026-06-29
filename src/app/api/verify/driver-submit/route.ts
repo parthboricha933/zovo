@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { getCurrentUser } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { notify } from '@/lib/notify'
+import { shouldAutoApproveVerifications } from '@/lib/dev-mode'
 
 /**
  * Driver verification submission.
@@ -59,8 +60,8 @@ export async function POST(req: NextRequest) {
     },
   })
 
-  // Dev: auto-approve
-  if (process.env.NODE_ENV !== 'production') {
+  // Auto-approve if enabled (default ON in dev, OFF in production unless AUTO_APPROVE_VERIFICATIONS=1)
+  if (shouldAutoApproveVerifications()) {
     await db.driverProfile.update({
       where: { userId: user.id },
       data: { status: 'APPROVED', verifiedAt: new Date() },

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { getCurrentUser } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { notify } from '@/lib/notify'
+import { shouldAutoApproveVerifications } from '@/lib/dev-mode'
 
 const schema = z.object({
   make: z.string().min(1),
@@ -35,6 +36,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Plate number already registered' }, { status: 400 })
   }
 
+  const autoApprove = shouldAutoApproveVerifications()
   const vehicle = await db.vehicle.create({
     data: {
       driverId: user.id,
@@ -47,9 +49,9 @@ export async function POST(req: NextRequest) {
       totalSeats: data.totalSeats,
       rcImage: data.rcImage || null,
       insuranceImage: data.insuranceImage || null,
-      status: process.env.NODE_ENV !== 'production' ? 'APPROVED' : 'PENDING',
-      verifiedAt: process.env.NODE_ENV !== 'production' ? new Date() : null,
-      reviewedBy: process.env.NODE_ENV !== 'production' ? user.id : null,
+      status: autoApprove ? 'APPROVED' : 'PENDING',
+      verifiedAt: autoApprove ? new Date() : null,
+      reviewedBy: autoApprove ? user.id : null,
     },
   })
 
