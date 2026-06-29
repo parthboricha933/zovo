@@ -18,6 +18,7 @@ import {
   Car, Loader2, ShieldCheck, Play, CheckCircle2, X, MapPin,
   Users, IndianRupee, Star, Phone, MessageCircle, Navigation,
 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 export function DriverActive() {
   const { params, navigate } = useUIStore()
