@@ -182,6 +182,35 @@ function BookingDetail({ booking, onChatOpen, onUpdate }: { booking: Booking; on
             <CardDescription>Booked {format(new Date(booking.requestedAt), 'dd MMM, HH:mm')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Stage progression indicator */}
+            <div className="flex items-center gap-1 text-[11px] font-medium">
+              {[
+                { key: 'REQUESTED', label: 'Requested' },
+                { key: 'CONFIRMED', label: 'Confirmed' },
+                { key: 'STARTED', label: 'In Ride' },
+                { key: 'COMPLETED', label: 'Completed' },
+              ].map((stage, i, arr) => {
+                const order = ['REQUESTED', 'CONFIRMED', 'STARTED', 'COMPLETED']
+                const currentIdx = order.indexOf(booking.status)
+                const stageIdx = order.indexOf(stage.key)
+                const done = stageIdx < currentIdx
+                const current = stageIdx === currentIdx
+                return (
+                  <div key={stage.key} className="flex items-center flex-1">
+                    <div className={cn(
+                      'flex-1 text-center py-1.5 px-1 rounded-md transition-colors',
+                      done ? 'bg-primary/15 text-primary' :
+                      current ? 'bg-primary text-primary-foreground' :
+                      'bg-muted text-muted-foreground'
+                    )}>
+                      {stage.label}
+                    </div>
+                    {i < arr.length - 1 && <div className={cn('w-1 h-0.5', done ? 'bg-primary' : 'bg-border')} />}
+                  </div>
+                )
+              })}
+            </div>
+
             {booking.ride && (
               <>
                 <div className="flex items-start gap-3">

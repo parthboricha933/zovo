@@ -75,5 +75,15 @@ export async function POST(req: NextRequest) {
     otp,
   })
 
+  // Also post the OTP as a system message in the in-app chat so the passenger
+  // can see it in the chat drawer too (not just email)
+  await db.message.create({
+    data: {
+      bookingId: booking.id,
+      senderId: user.id, // driver
+      content: `✅ Booking confirmed! Your OTP for pickup is: ${otp}. Share this 6-digit code with me when we meet at the pickup location.`,
+    },
+  }).catch(() => {})
+
   return NextResponse.json({ ok: true, bookingId, status: 'CONFIRMED' })
 }

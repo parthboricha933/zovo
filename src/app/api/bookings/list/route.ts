@@ -37,6 +37,8 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     items: bookings.map((b) => ({
       id: b.id,
+      rideId: b.rideId,
+      passengerId: b.passengerId,
       status: b.status,
       seatsBooked: b.seatsBooked,
       totalPrice: b.totalPrice,

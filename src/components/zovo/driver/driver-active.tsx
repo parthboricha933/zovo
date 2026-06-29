@@ -163,7 +163,7 @@ function ActiveRideDetail({ ride, verifying, onVerify, onActivate, onComplete, o
   const loadBookings = async () => {
     try {
       const r = await api.bookings.list(new URLSearchParams({ role: 'DRIVER' }))
-      const mine = r.items.filter((b) => b.rideId === ride.id)
+      const mine = r.items.filter((b) => (b.rideId || b.ride?.id) === ride.id)
       setBookings(mine)
     } catch {}
   }
@@ -174,7 +174,7 @@ function ActiveRideDetail({ ride, verifying, onVerify, onActivate, onComplete, o
       try {
         const r = await api.bookings.list(new URLSearchParams({ role: 'DRIVER' }))
         if (!cancelled) {
-          const mine = r.items.filter((b) => b.rideId === ride.id)
+          const mine = r.items.filter((b) => (b.rideId || b.ride?.id) === ride.id)
           setBookings(mine)
         }
       } catch {}
@@ -223,11 +223,41 @@ function ActiveRideDetail({ ride, verifying, onVerify, onActivate, onComplete, o
               <Badge className={
                 ride.status === 'ONGOING' ? 'bg-blue-100 text-blue-800' :
                 ride.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-800' :
+                ride.status === 'COMPLETED' ? 'bg-zinc-100 text-zinc-800' :
                 'bg-amber-100 text-amber-800'
               }>{ride.status}</Badge>
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
+            {/* Stage progression indicator */}
+            <div className="flex items-center gap-1 text-[11px] font-medium">
+              {[
+                { key: 'SCHEDULED', label: 'Scheduled' },
+                { key: 'ACTIVE', label: 'Pickup' },
+                { key: 'ONGOING', label: 'In Transit' },
+                { key: 'COMPLETED', label: 'Completed' },
+              ].map((stage, i, arr) => {
+                const order = ['SCHEDULED', 'ACTIVE', 'ONGOING', 'COMPLETED']
+                const currentIdx = order.indexOf(ride.status)
+                const stageIdx = order.indexOf(stage.key)
+                const done = stageIdx < currentIdx
+                const current = stageIdx === currentIdx
+                return (
+                  <div key={stage.key} className="flex items-center flex-1">
+                    <div className={cn(
+                      'flex-1 text-center py-1.5 px-1 rounded-md transition-colors',
+                      done ? 'bg-primary/15 text-primary' :
+                      current ? 'bg-primary text-primary-foreground' :
+                      'bg-muted text-muted-foreground'
+                    )}>
+                      {stage.label}
+                    </div>
+                    {i < arr.length - 1 && <div className={cn('w-1 h-0.5', done ? 'bg-primary' : 'bg-border')} />}
+                  </div>
+                )
+              })}
+            </div>
+
             <div className="flex items-start gap-3">
               <div className="flex flex-col items-center pt-1">
                 <div className="h-3 w-3 rounded-full bg-primary" />
@@ -245,8 +275,8 @@ function ActiveRideDetail({ ride, verifying, onVerify, onActivate, onComplete, o
                 <div className="text-sm font-medium">{format(new Date(ride.departureTime), 'dd MMM, HH:mm')}</div>
               </div>
               <div>
-                <div className="text-xs text-muted-foreground">Seats</div>
-                <div className="text-sm font-medium">{ride.availableSeats}/{ride.totalSeats}</div>
+                <div className="text-xs text-muted-foreground">Booked</div>
+                <div className="text-sm font-medium">{ride.totalSeats - ride.availableSeats}/{ride.totalSeats} seats</div>
               </div>
               <div>
                 <div className="text-xs text-muted-foreground">Per seat</div>
@@ -254,11 +284,12 @@ function ActiveRideDetail({ ride, verifying, onVerify, onActivate, onComplete, o
               </div>
             </div>
 
+            {/* Action buttons — change based on ride status */}
             <div className="flex flex-wrap gap-2 pt-2">
               {ride.status === 'SCHEDULED' && (
                 <>
                   <Button size="sm" className="flex-1" onClick={onActivate}>
-                    <Play className="h-4 w-4 mr-1.5" /> Activate ride
+                    <Play className="h-4 w-4 mr-1.5" /> Activate &amp; Go to Pickup
                   </Button>
                   <Button size="sm" variant="outline" className="text-destructive" onClick={onCancel}>
                     <X className="h-4 w-4 mr-1.5" /> Cancel
@@ -267,9 +298,10 @@ function ActiveRideDetail({ ride, verifying, onVerify, onActivate, onComplete, o
               )}
               {ride.status === 'ACTIVE' && (
                 <>
-                  <Button size="sm" className="flex-1" onClick={onComplete}>
-                    <CheckCircle2 className="h-4 w-4 mr-1.5" /> End ride
-                  </Button>
+                  <div className="flex-1 text-xs text-muted-foreground bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center gap-1.5">
+                    <ShieldCheck className="h-3.5 w-3.5 text-amber-600" />
+                    At pickup — ask passenger for OTP, enter it below to start the ride.
+                  </div>
                   <Button size="sm" variant="outline" className="text-destructive" onClick={onCancel}>
                     <X className="h-4 w-4 mr-1.5" /> Cancel
                   </Button>
@@ -277,8 +309,14 @@ function ActiveRideDetail({ ride, verifying, onVerify, onActivate, onComplete, o
               )}
               {ride.status === 'ONGOING' && (
                 <Button size="sm" className="flex-1" onClick={onComplete}>
-                  <CheckCircle2 className="h-4 w-4 mr-1.5" /> End ride
+                  <CheckCircle2 className="h-4 w-4 mr-1.5" /> Drop &amp; Complete Ride
                 </Button>
+              )}
+              {ride.status === 'COMPLETED' && (
+                <div className="flex-1 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Ride completed. Earnings recorded.
+                </div>
               )}
             </div>
           </CardContent>
@@ -287,11 +325,22 @@ function ActiveRideDetail({ ride, verifying, onVerify, onActivate, onComplete, o
         {/* Bookings list */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Passengers ({confirmed.length + requested.length})</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">
+                Passengers ({bookings.length})
+              </CardTitle>
+              {bookings.length > 0 && (
+                <div className="flex gap-2 text-xs">
+                  {requested.length > 0 && <Badge variant="secondary">{requested.length} pending</Badge>}
+                  {confirmed.length > 0 && <Badge className="bg-emerald-100 text-emerald-800">{confirmed.length} confirmed</Badge>}
+                  {started.length > 0 && <Badge className="bg-blue-100 text-blue-800">{started.length} in ride</Badge>}
+                </div>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="space-y-2">
             {bookings.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-6 text-center">No bookings yet.</p>
+              <p className="text-sm text-muted-foreground py-6 text-center">No bookings yet. Share your ride link to get passengers.</p>
             ) : (
               bookings.map((b) => (
                 <PassengerRow
