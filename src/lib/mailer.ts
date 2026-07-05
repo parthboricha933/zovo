@@ -14,11 +14,19 @@ function getTransporter() {
     console.warn('[mailer] SMTP credentials not configured')
     return null
   }
+  // Use port 587 (STARTTLS) which is more reliable on serverless platforms
+  // Fall back to 465 (SSL) if explicitly set
+  const port = SMTP_PORT
   transporter = nodemailer.createTransport({
     host: SMTP_HOST,
-    port: SMTP_PORT,
-    secure: SMTP_PORT === 465,
+    port,
+    secure: port === 465, // true for 465, false for 587
     auth: { user: SMTP_USER, pass: SMTP_PASS },
+    connectionTimeout: 10000, // 10s
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
+    logger: false,
+    debug: false,
   })
   return transporter
 }
@@ -37,6 +45,8 @@ export async function sendMail({ to, subject, text, html }: SendMailInput) {
     return null
   }
   try {
+    // Verify connection first (helps catch auth issues early)
+    // Skip verify in production to save time — just send directly
     const info = await t.sendMail({
       from: SMTP_FROM,
       to,
@@ -47,7 +57,9 @@ export async function sendMail({ to, subject, text, html }: SendMailInput) {
     console.log(`[mailer] Sent to ${to}: ${info.messageId}`)
     return info
   } catch (e: any) {
-    console.error('[mailer] send error', e)
+    console.error('[mailer] send error:', e?.message || String(e))
+    console.error('[mailer] error code:', e?.code)
+    console.error('[mailer] error response:', e?.response || e?.responseCode)
     return null
   }
 }
