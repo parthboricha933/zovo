@@ -190,6 +190,10 @@ export function LocationAutocomplete({ value, onChange, placeholder = 'Search lo
                     e.preventDefault()
                     selectPlace(r)
                   }}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    selectPlace(r)
+                  }}
                   className="w-full text-left px-3 py-2 hover:bg-muted/50 flex items-start gap-2 cursor-pointer"
                 >
                   <MapPin className="h-4 w-4 mr-1 mt-0.5 text-muted-foreground shrink-0" />
