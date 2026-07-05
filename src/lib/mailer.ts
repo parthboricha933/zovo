@@ -6,6 +6,10 @@ const SMTP_USER = process.env.SMTP_USER || ''
 const SMTP_PASS = process.env.SMTP_PASS || ''
 const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER
 
+// Resend HTTP API (works on Vercel — SMTP ports are blocked on serverless)
+const RESEND_API_KEY = process.env.RESEND_API_KEY || ''
+const RESEND_FROM = process.env.RESEND_FROM || SMTP_FROM || 'ZOVO <onboarding@resend.dev>'
+
 let transporter: nodemailer.Transporter | null = null
 
 function getTransporter() {
@@ -14,19 +18,15 @@ function getTransporter() {
     console.warn('[mailer] SMTP credentials not configured')
     return null
   }
-  // Use port 587 (STARTTLS) which is more reliable on serverless platforms
-  // Fall back to 465 (SSL) if explicitly set
   const port = SMTP_PORT
   transporter = nodemailer.createTransport({
     host: SMTP_HOST,
     port,
-    secure: port === 465, // true for 465, false for 587
+    secure: port === 465,
     auth: { user: SMTP_USER, pass: SMTP_PASS },
-    connectionTimeout: 10000, // 10s
+    connectionTimeout: 10000,
     greetingTimeout: 10000,
     socketTimeout: 15000,
-    logger: false,
-    debug: false,
   })
   return transporter
 }
@@ -38,15 +38,49 @@ export interface SendMailInput {
   html?: string
 }
 
+/**
+ * Try Resend HTTP API first (works on Vercel serverless), then fall back to
+ * SMTP (works on local dev / VPS). SMTP ports (465/587) are blocked on
+ * Vercel serverless functions.
+ */
 export async function sendMail({ to, subject, text, html }: SendMailInput) {
+  // 1. Try Resend HTTP API first (if configured)
+  if (RESEND_API_KEY) {
+    try {
+      const r = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: RESEND_FROM,
+          to: [to],
+          subject,
+          html: html || text,
+          text: text,
+        }),
+      })
+      if (r.ok) {
+        const data = await r.json()
+        console.log(`[mailer] Sent via Resend to ${to}: ${data.id}`)
+        return { messageId: data.id }
+      } else {
+        const errBody = await r.text()
+        console.error('[mailer] Resend error:', r.status, errBody)
+      }
+    } catch (e: any) {
+      console.error('[mailer] Resend fetch error:', e?.message)
+    }
+  }
+
+  // 2. Fall back to SMTP (works on local dev / VPS)
   const t = getTransporter()
   if (!t) {
-    console.warn(`[mailer] Skipping email to ${to} (no SMTP configured). Subject: ${subject}`)
+    console.warn(`[mailer] No email transport available (no Resend key, no SMTP). Skipping email to ${to}.`)
     return null
   }
   try {
-    // Verify connection first (helps catch auth issues early)
-    // Skip verify in production to save time — just send directly
     const info = await t.sendMail({
       from: SMTP_FROM,
       to,
@@ -54,12 +88,11 @@ export async function sendMail({ to, subject, text, html }: SendMailInput) {
       text,
       html,
     })
-    console.log(`[mailer] Sent to ${to}: ${info.messageId}`)
+    console.log(`[mailer] Sent via SMTP to ${to}: ${info.messageId}`)
     return info
   } catch (e: any) {
-    console.error('[mailer] send error:', e?.message || String(e))
-    console.error('[mailer] error code:', e?.code)
-    console.error('[mailer] error response:', e?.response || e?.responseCode)
+    console.error('[mailer] SMTP send error:', e?.message || String(e))
+    console.error('[mailer] SMTP error code:', e?.code)
     return null
   }
 }

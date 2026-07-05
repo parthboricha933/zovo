@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     html: `
       <div style="font-family: sans-serif; padding: 24px;">
         <h2>ZOVO SMTP Test</h2>
-        <p>This is a test email from ZOVO to verify SMTP is working.</p>
+        <p>This is a test email from ZOVO to verify email sending is working.</p>
         <p>If you received this, email sending is configured correctly!</p>
         <p>Sent at: ${new Date().toISOString()}</p>
       </div>
@@ -32,8 +32,9 @@ export async function POST(req: Request) {
   if (result) {
     return NextResponse.json({
       ok: true,
-      messageId: result.messageId,
+      messageId: (result as any).messageId || (result as any).id,
       sentTo: recipient,
+      method: process.env.RESEND_API_KEY ? 'resend' : 'smtp',
     })
   } else {
     return NextResponse.json({
@@ -42,6 +43,7 @@ export async function POST(req: Request) {
       smtpUser: process.env.SMTP_USER || '(not set)',
       smtpHost: process.env.SMTP_HOST || '(not set)',
       smtpPort: process.env.SMTP_PORT || '(not set)',
+      resendConfigured: !!process.env.RESEND_API_KEY,
     }, { status: 500 })
   }
 }
