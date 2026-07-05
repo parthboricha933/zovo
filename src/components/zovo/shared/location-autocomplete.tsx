@@ -141,7 +141,7 @@ export function LocationAutocomplete({ value, onChange, placeholder = 'Search lo
             if (!e.target.value) onChange(null)
           }}
           onFocus={() => results.length > 0 && setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 200)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
           placeholder={placeholder}
           className="pl-9 pr-20"
         />
@@ -171,8 +171,11 @@ export function LocationAutocomplete({ value, onChange, placeholder = 'Search lo
         </div>
       </div>
 
-      {open && (
-        <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-lg max-h-72 overflow-y-auto zovo-scroll">
+      {open && (results.length > 0 || loading || query.length >= 2) && (
+        <div
+          className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-lg max-h-72 overflow-y-auto zovo-scroll"
+          onMouseDown={(e) => e.preventDefault()}
+        >
           {results.length === 0 ? (
             <div className="py-6 text-center text-sm text-muted-foreground">
               {loading ? 'Searching…' : query.length < 2 ? 'Type at least 2 characters' : 'No results found'}
@@ -183,7 +186,10 @@ export function LocationAutocomplete({ value, onChange, placeholder = 'Search lo
                 <button
                   key={r.id || r.label}
                   type="button"
-                  onClick={() => selectPlace(r)}
+                  onMouseDown={(e) => {
+                    e.preventDefault()
+                    selectPlace(r)
+                  }}
                   className="w-full text-left px-3 py-2 hover:bg-muted/50 flex items-start gap-2 cursor-pointer"
                 >
                   <MapPin className="h-4 w-4 mr-1 mt-0.5 text-muted-foreground shrink-0" />
